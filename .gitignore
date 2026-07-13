@@ -1,0 +1,12 @@
+Microsoft VS Code/
+bb.exe
+.cpcache/
+.calva/
+.lsp/
+.clj-kondo/
+target/
+*.db
+datasource
+memory
+test-db
+.nrepl-port

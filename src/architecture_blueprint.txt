@@ -1,0 +1,15 @@
+Architecture Blueprint
+📁 Windows Disk (mock_data.vcf) 
+       │
+       ▼ (Line-by-line Stream via clojure.java.io/reader)
+ ┌──────────┐
+ │ Memory   │  <─── Tiny, steady RAM allocation (Garbage collector cleans up old rows)
+ └────┬─────┘
+      ▼ (Transducer Stack)
+ ┌──────────┐
+ │  Parser  │  <─── Drops comments, trims whitespace, verifies structural counts
+ └────┬─────┘
+      ▼ (Router Integration)
+ ┌──────────┐
+ │  Router  │  ───► Clean Records  ───► Console Log/Database
+ └──────────┘  ───► Corrupt Rows   ───► append-safe error_dlq.json

@@ -1,0 +1,14 @@
+# Clojure Learning Journey: Day 9 Init
+- Target: 3-Month Bioinformatician Pivot (60 Hours/Week Hyper-Focus)
+- Workspace: VS Code + Calva REPL connected natively to Babashka (F:\clojure)
+- Code Standard Established: Strict lowercase directories and hyphenated namespaces (`upgraded-bio-report.upgraded-bio-report-day8`) managed natively via a root `deps.edn` template.
+
+### Current Project State
+1. Verified end-to-end FASTA analytical parser translating cancer variants (`BRAF_V600E_Mutant`, `KRAS_G12D_Mutant`) with zero truncated codons.
+2. Verified local `deps.edn` resolving workspace paths cleanly under `bb -cp src`.
+3. Fresh asset generated on disk: `F:\clojure\structural_variants.vcf`.
+
+### Objectives for Today
+Act as my expert code reviewer and genomics pipeline architect. Guide me form-by-form to build Section 1 of the Day 9 module: The Lazy Stream Tokenization Engine to parse structural chromosomal rearrangements (deletions, duplications, translocations) without memory inflation. 
+
+Let's begin: What is the structural layout of a VCF metadata header line, and how do we use `line-seq` and `filter` to strip them out declaratively?
