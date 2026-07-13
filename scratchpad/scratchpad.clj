@@ -1,10 +1,10 @@
 (ns scratchpad.scratchpad
-  (:require [clojure.test :refer [is]] 
-            [clojure.spec.alpha :as s] 
-            [next.jdbc :as jdbc] 
-            [clojure.spec.gen.alpha :as gen] 
+  (:require [clojure.test :refer [is]]
+            [clojure.spec.alpha :as s]
+            [next.jdbc :as jdbc]
+            [clojure.spec.gen.alpha :as gen]
             [next.jdbc.sql :as sql]))
-  
+
 ;;1 The Core Infrastucture Map
 (def pipeline-cfg {:port 8080 :timeout 3000 :engine "sqlite"})
 
@@ -14,19 +14,19 @@
 (is (number? (:timeout pipeline-cfg)))
 (is (string? (:engine pipeline-cfg)))
 
-(is (contains? :port pipeline-cfg ))
-(is (number? (pipeline-cfg :timeout )))
+(is (contains? :port pipeline-cfg))
+(is (number? (pipeline-cfg :timeout)))
 
-(is (string? (pipeline-cfg :engine )))
+(is (string? (pipeline-cfg :engine)))
 
 (is (contains? pipeline-cfg :port))
 (is (number? (:timeout)))
 
-(is (string? (:engine )))
+(is (string? (:engine)))
 
 (s/def :pipeline/id integer?)
 (s/def :pipeline/status string?)
-(s/valid? :pipeline/id 101 )
+(s/valid? :pipeline/id 101)
 (s/valid? :pipeline/status 101)
 (s/def :pipeline/log-entry (s/keys :req [:pipeline/id :pipeline/status]))
 (s/valid? :pipeline/log-entry {:pipeline/id 200 :pipeline/status "active"})
@@ -37,10 +37,10 @@
 (defn insert-to-sqlite! [data] :stored-successfully)
 
 (defn save-pipeline-log! [payload]
- (if (s/valid? :pipeline/log-entry payload)
-   (insert-to-sqlite! payload)
-   (throw (ex-info "Pipeline Write Intercepted: Payload failed schema validation contract."
-                  {:explain-data (s/explain-data :pipeline/log-entry payload)}))))
+  (if (s/valid? :pipeline/log-entry payload)
+    (insert-to-sqlite! payload)
+    (throw (ex-info "Pipeline Write Intercepted: Payload failed schema validation contract."
+                    {:explain-data (s/explain-data :pipeline/log-entry payload)}))))
 
 (save-pipeline-log! {:pipeline/id 305 :pipeline/status "processing"})
 (save-pipeline-log! {:pipeline/id "samuel" :pipeline/status "processing"})
@@ -81,29 +81,33 @@
 (gen/sample (s/gen :pipeline/log-entry) 3)
 
 ;; 1. Register your individual data component types
-(s/def :pipeline/unique-id uuid?)
+(s/def :pipeline/log_id uuid?)
 (s/def :pipeline/status string?)
 (s/def :pipeline/telemetry integer?)
 
 ;; 2. Combine all three components into the required key structure
-(s/def :pipeline/log-entry (s/keys :req [:pipeline/unique-id :pipeline/status :pipeline/telemetry]))
-(gen/sample (s/gen :pipeline/log-entry) 50)
+(s/def :pipeline/log-entry (s/keys :req [:pipeline/log_id :pipeline/status :pipeline/telemetry]))
 
-(def mock-ds {:dbtype "sqlite" :dbname "memory"})
-(pipeline.integration-test/commit-log-batch! mock-ds my-50-rows)
+(def mock-ds {:dbtype "sqlite" :dbname ":memory:"})
 
 (defn initialize-test-database! [datasource]
   (jdbc/execute! datasource
-                 ["CREATE TABLE telemetry_logs (id TEXT PRIMARY KEY, Status TEXT, telemetry INTEGER);"]))
+                 ["CREATE TABLE telemetry_logs (log_id TEXT PRIMARY KEY, Status TEXT, telemetry INTEGER);"]))
+
 (initialize-test-database! mock-ds)
-(def my-update-row(clojure.spec.gen.alpha/sample (clojure.spec.alpha/gen :pipeline/log-entry) 50))
+
 (pipeline.integration-test/commit-log-batch! mock-ds my-update-row)
 
+;; Pulling the heavy native JVM #uuid object instance out and cast it to pure text string primitive
+(defn normalize-payload [payload]
+  (let [raw-uuid (:pipeline/log_id payload)]
+    (assoc payload :pipeline/log_id (str raw-uuid))))
 
+(normalize-payload (gen/generate (s/gen :pipeline/log-entry)))
 
+(initialize-test-database! mock-ds)
 
+(def large-stress-batch (gen/sample (s/gen :pipeline/log-entry) 50))
 
-
-
-
+(pipeline.integration-test/commit-log-batch! mock-ds large-stress-batch)
 
