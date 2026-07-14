@@ -3,36 +3,9 @@
             [clojure.spec.alpha :as s]
             [next.jdbc :as jdbc]
             [clojure.spec.gen.alpha :as gen]
-            [next.jdbc.sql :as sql]))
-
-;;1 The Core Infrastucture Map
-(def pipeline-cfg {:port 8080 :timeout 3000 :engine "sqlite"})
-
-;;2 The Verification Checks (Single-argument lookup syntax!)
-
-(is (contains? pipeline-cfg :port))
-(is (number? (:timeout pipeline-cfg)))
-(is (string? (:engine pipeline-cfg)))
-
-(is (contains? :port pipeline-cfg))
-(is (number? (pipeline-cfg :timeout)))
-
-(is (string? (pipeline-cfg :engine)))
-
-(is (contains? pipeline-cfg :port))
-(is (number? (:timeout)))
-
-(is (string? (:engine)))
-
-(s/def :pipeline/id integer?)
-(s/def :pipeline/status string?)
-(s/valid? :pipeline/id 101)
-(s/valid? :pipeline/status 101)
-(s/def :pipeline/log-entry (s/keys :req [:pipeline/id :pipeline/status]))
-(s/valid? :pipeline/log-entry {:pipeline/id 200 :pipeline/status "active"})
-(s/valid? :pipeline/log-entry {:pipeline/id 200 :pipeline/status "active"})
-(s/valid? :pipeline/log-entry {:pipeline/id "Samuel" :pipeline/status "inactive"})
-(s/explain :pipeline/log-entry {:pipeline/id "Samuel" :pipeline/status "inactive"})
+            [next.jdbc.sql :as sql]
+            [clojure.data.csv :as csv]
+            [clojure.java.io :as io]))
 
 (defn insert-to-sqlite! [data] :stored-successfully)
 
@@ -88,15 +61,13 @@
 ;; 2. Combine all three components into the required key structure
 (s/def :pipeline/log-entry (s/keys :req [:pipeline/log_id :pipeline/status :pipeline/telemetry]))
 
-(def mock-ds {:dbtype "sqlite" :dbname ":memory:"})
+(def mock-ds {:dbtype "sqlite" :dbname "data/pipeline_storage.db"})
 
 (defn initialize-test-database! [datasource]
   (jdbc/execute! datasource
                  ["CREATE TABLE telemetry_logs (log_id TEXT PRIMARY KEY, Status TEXT, telemetry INTEGER);"]))
 
 (initialize-test-database! mock-ds)
-
-(pipeline.integration-test/commit-log-batch! mock-ds my-update-row)
 
 ;; Pulling the heavy native JVM #uuid object instance out and cast it to pure text string primitive
 (defn normalize-payload [payload]
@@ -109,5 +80,30 @@
 
 (def large-stress-batch (gen/sample (s/gen :pipeline/log-entry) 50))
 
+(with-open [conn (jdbc/get-connection mock-ds)]
+  (initialize-test-database! conn)
+  (pipeline.integration-test/commit-log-batch! conn large-stress-batch))
+
 (pipeline.integration-test/commit-log-batch! mock-ds large-stress-batch)
 
+(defn read-ingestion-file [file-path]
+  (with-open [reader (io/reader file-path)]
+    (doall (csv/read-csv reader))))
+
+(defn raw-row->spec-map [row]
+  ;;Destructuring the array elements based on position index locations
+  (let [[id-str status-str telemetry-str] row]
+    {:pipeline/log_id (java.util.UUID/fromString id-str)
+     :pipeline/status status-str
+     :pipeline/telemetry (Integer/parseInt telemetry-str)}))
+
+(raw-row->spec-map ["5552c77c-0792-4e81-a312-aa41c721a709","Dx23FP5UNM509X707iyP98S", "1"])
+
+;;Mapping Full Ingest Loop
+(defn process-csv-pipeline! [datasource file-path]
+  ;; 1. To read all the rows from the physical disk file
+  (let [row-raws (read-ingestion-file file-path)
+    ;; 2. For skipping the header row and map text rows into Spec maps
+        clean-batch (map raw-row->spec-map (next raw-rows))]
+    ;; 3. Pipe the clean batch maps straight into next.jdbc transaction!
+    (pipeline.integration-test/commit-log-batch! datasource clean-batch)))
