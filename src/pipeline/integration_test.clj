@@ -7,7 +7,8 @@
             [clojure.string :as str]
             [next.jdbc.sql :as sql]
             [pipeline.db :as db]
-            [clojure.spec.alpha :as s]))
+            [clojure.spec.alpha :as s]
+            [scratchpad.scratchpad :as utilis]))
 
 (deftest end-to-end-relational-schema-test
   (let [test-csv "target/test_orders.csv"
@@ -95,8 +96,11 @@
     ;2 Run verified loop over the batch box
     (doseq [payload batch-payloads]
       (if (s/valid? :pipeline/log-entry payload)
+        ;; Extract, flatten the #uuid object, and bind the clean map shape
         ;; Path A. Modern next.jdbc single execution syntax
-        (sql/insert! tx-con :telemetry_logs payload)
+        (let [clean-payload (utilis/normalize-payload payload)]
+        ;; The perfectly flat, safe text payload to SQlite
+        (sql/insert! tx-con :telemetry_logs clean-payload))
         ;; Path B Rollback trigger
         (throw (ex-info "Transaction Aborted: Corrupt record encountered." payload))))))
 

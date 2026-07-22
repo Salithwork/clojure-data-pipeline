@@ -83,6 +83,7 @@
 
 (pipeline.integration-test/commit-log-batch! mock-ds large-stress-batch)
 
+
 (defn read-ingestion-file [file-path]
   (with-open [reader (io/reader file-path)]
     (doall (csv/read-csv reader))))
@@ -260,3 +261,22 @@ c6ab1dbb-4f14-45c0-b6c4-1379155b0fb5,completed,3400
             (println "[SECURITY ERROR] File write incomplete or file missing: " file-path))
           (recur))
       (println "[Streaming Engine] Channel Offline."))))
+
+(defn test-reactive-pipeline! []
+  (do 
+    ;;1. Regenerating target  sabotaged telemetry file on disk
+   (create-troublesome-csv! "data/troublesome_telemetry.csv")
+   ;;2. Pushing target path string down the streaming  communication channel box
+    (clojure.core.async/>!! streaming-bus "data/troublesome_telemetry.csv")
+
+    (println "[COCKPIT TEST] Automated event dispatched successfully.")))
+
+(test-reactive-pipeline!)
+
+  ;; 1. Initialize a strict, memory-capped dropping buffer pool channel
+  (def resilient-stream (clojure.core.async/chan (clojure.core.async/dropping-buffer 50)))
+
+  ;; 2. Asynchronously drop a mock data packet inside the throttled bus safely
+  (clojure.core.async/go
+    (let [event-payload "data/troublesome_telemetry.csv"]
+      (clojure.core.async/>! resilient-stream event-payload)))
