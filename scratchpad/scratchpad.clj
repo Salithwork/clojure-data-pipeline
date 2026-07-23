@@ -18,7 +18,6 @@
     (throw (ex-info "Pipeline Write Intercepted: Payload failed schema validation contract."
                     {:explain-data (s/explain-data :pipeline/log-entry payload)}))))
 
-
 (let [batch-box [{:pipeline/id 101 :pipeline/status "active"}     ;; Good Map
                  {:pipeline/id "Samuel" :pipeline/status "error"}]] ;; Corrupted Map
   ;; This is our data box. Now we can run our conveyor belt on it.
@@ -255,7 +254,7 @@ c6ab1dbb-4f14-45c0-b6c4-1379155b0fb5,completed,3400
       (do (println "\n[Streaming Engine] Discovered  file path event:" file-path)
           ;; DEFENSIVE LAYER: Wait until the upstream writer releases the OS Lock
           (if (file-completely-written? file-path)
-            (do (println "[Streaming Engine] File stabilized. Triggering ingestion database transaction..." )
+            (do (println "[Streaming Engine] File stabilized. Triggering ingestion database transaction...")
                 (process-csv-pipeline! mock-ds file-path)
                 (archive-file! (clojure.java.io/file file-path) "archive"))
             (println "[SECURITY ERROR] File write incomplete or file missing: " file-path))
@@ -263,20 +262,24 @@ c6ab1dbb-4f14-45c0-b6c4-1379155b0fb5,completed,3400
       (println "[Streaming Engine] Channel Offline."))))
 
 (defn test-reactive-pipeline! []
-  (do 
+  (do
     ;;1. Regenerating target  sabotaged telemetry file on disk
-   (create-troublesome-csv! "data/troublesome_telemetry.csv")
-   ;;2. Pushing target path string down the streaming  communication channel box
+    (create-troublesome-csv! "data/troublesome_telemetry.csv")
+    ;;2. Pushing target path string down the streaming  communication channel box
     (clojure.core.async/>!! streaming-bus "data/troublesome_telemetry.csv")
 
     (println "[COCKPIT TEST] Automated event dispatched successfully.")))
 
 (test-reactive-pipeline!)
 
-  ;; 1. Initialize a strict, memory-capped dropping buffer pool channel
-  (def resilient-stream (clojure.core.async/chan (clojure.core.async/dropping-buffer 50)))
+;; 1. Initialize a strict, memory-capped dropping buffer pool channel
+(def resilient-stream (clojure.core.async/chan (clojure.core.async/dropping-buffer 50)))
 
-  ;; 2. Asynchronously drop a mock data packet inside the throttled bus safely
-  (clojure.core.async/go
-    (let [event-payload "data/troublesome_telemetry.csv"]
-      (clojure.core.async/>! resilient-stream event-payload)))
+;; 2. Asynchronously drop a mock data packet inside the throttled bus safely
+(clojure.core.async/go
+  (let [event-payload "data/troublesome_telemetry.csv"]
+    (clojure.core.async/>! resilient-stream event-payload)))
+
+(binding [*compile-path* "target/classes"] 
+  (clojure.java.io/make-parents "target/classes/dummy.txt")
+  (compile 'pipeline.main))

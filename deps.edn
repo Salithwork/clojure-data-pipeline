@@ -9,4 +9,7 @@
   org.clojure/core.async            {:mvn/version "1.9.865"}} 
 
  :aliases
- {:run-cli {:main-opts ["-m" "pipeline.main"]}}}
+ {:run-cli {:main-opts ["-m" "pipeline.main"]}
+  
+  :build   {:deps {org.clojure/tools.build {:mvn/version "0.9.6"}}
+              :ns-default build}}}
