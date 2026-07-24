@@ -1,11 +1,16 @@
-# --- Production Runtime Sandbox Environment ---
+FROM clojure:tools-deps-alpine AS builder
+WORKDIR /build
+
+COPY deps.edn ./
+COPY src/ ./src/
+
+RUN clojure -Spath > classpath.txt
+
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# Copy your local cache libraries and project sources straight into the sandbox
-COPY .cpcache/ ./.cpcache/
-COPY src/ ./src/
-COPY target/classes/ ./target/classes/
+COPY --from=builder /root/.m2 /root/.m2
+COPY --from=builder /build ./
 
-# Run the compiled bytecode using a Linux colon path separator
-CMD ["java", "-cp", "target/classes:src:.cpcache", "pipeline.main", "data"]
+
+CMD ["sh", "-c", "java -cp $(cat classpath.txt) clojure.main -m pipeline.main data"]
